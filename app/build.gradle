@@ -1,0 +1,37 @@
+apply plugin: 'com.android.application'
+
+android {
+    compileSdkVersion 28
+    buildToolsVersion "28.0.0"
+    defaultConfig {
+        applicationId "com.qualcomm.qti.snpedetector"
+        minSdkVersion 23 /* Android 6.0 (M), Aug 2015 */
+        targetSdkVersion 28
+        versionCode 1
+        versionName "1.0"
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    // SNPE 32 & 64-bit LLVM Android Library (AAR)
+    implementation files('src/main/libs/snpe-release.aar')
+    // easy camera library
+    implementation 'io.fotoapparat.fotoapparat:library:2.2.0'
+    // permission to use camera
+    implementation 'pub.devrel:easypermissions:1.2.0'
+
+    //noinspection GradleCompatible
+    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+}
