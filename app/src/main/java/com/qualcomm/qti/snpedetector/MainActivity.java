@@ -80,6 +80,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private ArrayMap<Integer, String> classificationMap;
 
     private double confLevel = 0.7;
+    private int state = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -94,7 +95,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
         mOverlayRenderer = findViewById(R.id.overlayRenderer);
-        ((SeekBar) findViewById(R.id.thresholdBar)).setOnSeekBarChangeListener(mThresholdListener);
+        //((SeekBar) findViewById(R.id.thresholdBar)).setOnSeekBarChangeListener(mThresholdListener);
 
         classificationMap = makeClassMap();
         prevTime = System.currentTimeMillis();
@@ -108,6 +109,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         try {
             startActivityForResult(i, 100);
+
         } catch (ActivityNotFoundException a) {
             Toast.makeText(getApplicationContext(),
                     "sorry",
@@ -128,6 +130,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                     //txtSpeechInput.setText(result.get(0));
                     //Toast.makeText(getApplicationContext(), result.get(0), Toast.LENGTH_SHORT).show();
                     speechInput = result.get(0);
+                    modeB(speechInput);
                 }
                 break;
             }
@@ -142,6 +145,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             if (status == 1) {
                 buttonTest.setText("Switch to general");
                 buttonTest.setTag(0);
+                promptSpeechInput();
             } else {
                 buttonTest.setText("Switch to Finder");
                 buttonTest.setTag(1);
@@ -268,44 +272,95 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             // deep copy the results so we can draw the current set while guessing the next set
             mOverlayRenderer.setBoxesFromAnotherThread(boxes);
 
-            if((int)buttonTest.getTag() == 1) {
+            if ((int) buttonTest.getTag() == 1) {
                 //mode A
                 //INCREMENT OBJ COUNTERS
                 for (Box box : boxes) {
-                    if(box.type_id == 0 || box.type_score < confLevel) continue;
+                    if (box.type_id == 0 || box.type_score < confLevel) continue;
                     counterList.get(box.type_id).count++;
                 }
 
                 //IF TIMER AT t = 5 seconds
-                if (System.currentTimeMillis() - prevTime > 5000) {
+                if (System.currentTimeMillis() - prevTime > 3000) {
                     //print output
                     ObjCounter maxObj = Collections.max(counterList);
-                    mOverlayRenderer.accessibilityOutput("the object is "+ (String)(classificationMap.get((Integer)(maxObj.index))));
+                    mOverlayRenderer.accessibilityOutput("there is a " + (String) (classificationMap.get((Integer) (maxObj.index)))+" in front of you");
 
                     //clear list
                     counterList = ObjCounter.createCounters();
 
                     prevTime = System.currentTimeMillis();
                 }
-            } else {
-                //mode B
-                promptSpeechInput();
-                if(speechInput.equals("")) {
-                    //no input
-                }
-                if(!classificationMap.containsValue(speechInput)) {
-                    //no category
-                }
-
-                //look for input
             }
+            /*
+            else {
+                //mode B
 
+                if (state == 0) {
+                    //new query
+                    promptSpeechInput();
+                    //if (speechInput.equals("")) {
+                        //.accessibilityOutput("please repeat");
+                        promptSpeechInput();
+                        if (speechInput.equals("")) {
+                            mOverlayRenderer.accessibilityOutput("no input detected");
+                            //failed query, go to mode A
+                            state = 3;
+                        }
+                    }
+
+                    if (state != 3 && !classificationMap.containsValue(speechInput)) {
+                        mOverlayRenderer.accessibilityOutput("could not find " + speechInput);
+                        //failed query, go to mode A
+                        state = 3;
+                    } else if(state != 3 && classificationMap.containsValue(speechInput.toLowerCase().trim())){
+                        mOverlayRenderer.accessibilityOutput("looking for " + speechInput);
+                        state = 1; //start looking
+                        prevTime = System.currentTimeMillis();
+                    }
+                }
+
+                if (state != 3 && state == 1) { //?
+                    //look:
+                    for (Box box : boxes) {
+                        if (box.type_score > confLevel && box.type_name.equals(speechInput.toLowerCase().trim())) {
+                            //found
+                            mOverlayRenderer.accessibilityOutput("found " + speechInput);
+                            //go to mode A
+                            state = 3;
+                        }
+                    }
+
+                    //not found yet, keep trying until time runs out
+                    if ((state != 3) && (state == 1) && System.currentTimeMillis() - prevTime > 20000) {
+                        //time ran out
+                        mOverlayRenderer.accessibilityOutput("failed to find " + speechInput);
+                        //go to mode A
+                        prevTime = System.currentTimeMillis();
+                        state = 3;
+                    }
+                }
+
+                if (state == 3) {
+                    //go to mode A
+
+                    buttonTest.setText("Switch to Finder");
+                    buttonTest.setTag(1);
+                    state=0;
+                }
+            }
+    */
             // done, schedule a UI update
             mTimer2.stopInterval("frame", 10, false);
             mTimer2.tick("cam", 10);
             runOnUiThread(mUpdateTopLabelTask);
         }
     };
+
+    private void modeB(String a){
+        mOverlayRenderer.accessibilityOutput("Mode B started with " + a);
+
+    }
 
     private SeekBar.OnSeekBarChangeListener mThresholdListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
