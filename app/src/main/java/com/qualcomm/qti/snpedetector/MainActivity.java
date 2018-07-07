@@ -2,6 +2,7 @@ package com.qualcomm.qti.snpedetector;
 
 import android.Manifest;
 import android.arch.lifecycle.Lifecycle;
+import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -11,6 +12,8 @@ import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -46,8 +49,10 @@ import pub.devrel.easypermissions.EasyPermissions;
  * When Boxes are updated:
  * 1. update box rendering in the Overlay
  */
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements View.OnClickListener{
     public static final String LOGTAG = "SNPEDetector";
+
+    private Button buttonTest;
 
     private SNPEHelper mSnpeHelper;
     private CameraPreviewHelper mCameraPreviewHelper;
@@ -67,12 +72,35 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
         // populate UI
         setContentView(R.layout.activity_main);
+
+        buttonTest = ( Button )findViewById(R.id.button1);
+        buttonTest.setOnClickListener(this);
+        buttonTest.setTag(1);
+        buttonTest.setText("Switch to Finder");
+
+
         mOverlayRenderer = findViewById(R.id.overlayRenderer);
         ((SeekBar) findViewById(R.id.thresholdBar)).setOnSeekBarChangeListener(mThresholdListener);
     }
+
+    public void onClick(View vi) {
+
+        if(vi == buttonTest) {
+            final int status = (Integer) vi.getTag();
+            if(status == 1){
+                buttonTest.setText("Switch to general");
+                buttonTest.setTag(0);
+            }
+            else {
+                buttonTest.setText("Switch to Finder");
+                buttonTest.setTag(1);
+            }
+
+        }
+    }
+
 
     // this function makes sure we load the network the first time it's required - we could do it
     // in the onCreate, but this will block the first paint of the UI, leaving a gray box
