@@ -2,6 +2,7 @@ package com.qualcomm.qti.snpedetector;
 
 import android.Manifest;
 import android.arch.lifecycle.Lifecycle;
+import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -9,6 +10,7 @@ import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.os.Bundle;
+import android.speech.RecognizerIntent;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
@@ -16,6 +18,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.qualcomm.qti.snpedetector.helpers.CameraPreviewHelper;
 import com.qualcomm.qti.snpedetector.helpers.NV21ConversionHelper;
@@ -23,7 +26,7 @@ import com.qualcomm.qti.snpedetector.helpers.SNPEHelper;
 import com.qualcomm.qti.snpedetector.helpers.TimeStat;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Locale;
 
 import io.fotoapparat.parameter.Resolution;
 import io.fotoapparat.preview.Frame;
@@ -86,7 +89,47 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
         mOverlayRenderer = findViewById(R.id.overlayRenderer);
         ((SeekBar) findViewById(R.id.thresholdBar)).setOnSeekBarChangeListener(mThresholdListener);
+
+        promptSpeechInput();
     }
+
+    public void promptSpeechInput() {
+        Intent i = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
+        i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Say Something");
+
+        try{
+            startActivityForResult(i, 100);
+        }
+        catch (ActivityNotFoundException a) {
+            Toast.makeText(getApplicationContext(),
+                    "sorry",
+                    Toast.LENGTH_SHORT).show();
+        }
+
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        switch (requestCode) {
+            case 100: {
+                if (resultCode == RESULT_OK && null != data) {
+
+                    ArrayList<String> result = data
+                            .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                    //txtSpeechInput.setText(result.get(0));
+                    Toast.makeText(getApplicationContext(), result.get(0),
+                            Toast.LENGTH_SHORT).show();
+                }
+                break;
+            }
+
+        }
+    }
+
 
     public void onClick(View vi) {
 
