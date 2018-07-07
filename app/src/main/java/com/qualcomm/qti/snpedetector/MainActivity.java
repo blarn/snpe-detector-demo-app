@@ -13,6 +13,7 @@ import android.os.Bundle;
 import android.speech.RecognizerIntent;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
+import android.util.ArrayMap;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -26,6 +27,7 @@ import com.qualcomm.qti.snpedetector.helpers.SNPEHelper;
 import com.qualcomm.qti.snpedetector.helpers.TimeStat;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Locale;
 
 import io.fotoapparat.parameter.Resolution;
@@ -53,7 +55,7 @@ import pub.devrel.easypermissions.EasyPermissions;
  * When Boxes are updated:
  * 1. update box rendering in the Overlay
  */
-public class MainActivity extends AppCompatActivity implements View.OnClickListener{
+public class MainActivity extends AppCompatActivity implements View.OnClickListener {
     public static final String LOGTAG = "SNPEDetector";
 
     private Button buttonTest;
@@ -72,8 +74,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Paint mModelBitmapPaint;
     private final TimeStat mTimer = new TimeStat();
     private final TimeStat mTimer2 = new TimeStat();
+    private ArrayList<ObjCounter> counterList = ObjCounter.createCounters();
+    private long prevTime;
+    private String speechInput;
+    private ArrayMap<Integer, String> classificationMap;
 
-    private int ctr = 0;
+    private double confLevel = 0.7;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,7 +87,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         // populate UI
         setContentView(R.layout.activity_main);
 
-        buttonTest = ( Button )findViewById(R.id.button1);
+        buttonTest = (Button) findViewById(R.id.button1);
         buttonTest.setOnClickListener(this);
         buttonTest.setTag(1);
         buttonTest.setText("Switch to Finder");
@@ -90,7 +96,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mOverlayRenderer = findViewById(R.id.overlayRenderer);
         ((SeekBar) findViewById(R.id.thresholdBar)).setOnSeekBarChangeListener(mThresholdListener);
 
-        promptSpeechInput();
+        classificationMap = makeClassMap();
+        prevTime = System.currentTimeMillis();
     }
 
     public void promptSpeechInput() {
@@ -99,30 +106,28 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         i.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
         i.putExtra(RecognizerIntent.EXTRA_PROMPT, "Say Something");
 
-        try{
+        try {
             startActivityForResult(i, 100);
-        }
-        catch (ActivityNotFoundException a) {
+        } catch (ActivityNotFoundException a) {
             Toast.makeText(getApplicationContext(),
                     "sorry",
                     Toast.LENGTH_SHORT).show();
         }
-
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        speechInput = "";
         super.onActivityResult(requestCode, resultCode, data);
 
         switch (requestCode) {
             case 100: {
                 if (resultCode == RESULT_OK && null != data) {
 
-                    ArrayList<String> result = data
-                            .getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
+                    ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                     //txtSpeechInput.setText(result.get(0));
-                    Toast.makeText(getApplicationContext(), result.get(0),
-                            Toast.LENGTH_SHORT).show();
+                    //Toast.makeText(getApplicationContext(), result.get(0), Toast.LENGTH_SHORT).show();
+                    speechInput = result.get(0);
                 }
                 break;
             }
@@ -132,18 +137,15 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
 
     public void onClick(View vi) {
-
-        if(vi == buttonTest) {
+        if (vi == buttonTest) {
             final int status = (Integer) vi.getTag();
-            if(status == 1){
+            if (status == 1) {
                 buttonTest.setText("Switch to general");
                 buttonTest.setTag(0);
-            }
-            else {
+            } else {
                 buttonTest.setText("Switch to Finder");
                 buttonTest.setTag(1);
             }
-
         }
     }
 
@@ -266,17 +268,37 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
             // deep copy the results so we can draw the current set while guessing the next set
             mOverlayRenderer.setBoxesFromAnotherThread(boxes);
 
-            //INCREMENT OBJ COUNTERS
+            if((int)buttonTest.getTag() == 1) {
+                //mode A
+                //INCREMENT OBJ COUNTERS
+                for (Box box : boxes) {
+                    if(box.type_id == 0 || box.type_score < confLevel) continue;
+                    counterList.get(box.type_id).count++;
+                }
 
-            //IF TIMER AT t
-            //ObjCounter maxObj = Collections.max(list);
-            //mOverlayRenderer.accessibilityOutput("the object is "+maxObj.type_name);
-            //CLEAR DATA STRUCTURE
+                //IF TIMER AT t = 5 seconds
+                if (System.currentTimeMillis() - prevTime > 5000) {
+                    //print output
+                    ObjCounter maxObj = Collections.max(counterList);
+                    mOverlayRenderer.accessibilityOutput("the object is "+ (String)(classificationMap.get((Integer)(maxObj.index))));
 
-            if(ctr % 60 == 0) {
-                mOverlayRenderer.accessibilityOutput("yay the audio is working");
+                    //clear list
+                    counterList = ObjCounter.createCounters();
+
+                    prevTime = System.currentTimeMillis();
+                }
+            } else {
+                //mode B
+                promptSpeechInput();
+                if(speechInput.equals("")) {
+                    //no input
+                }
+                if(!classificationMap.containsValue(speechInput)) {
+                    //no category
+                }
+
+                //look for input
             }
-            ctr++;
 
             // done, schedule a UI update
             mTimer2.stopInterval("frame", 10, false);
@@ -347,4 +369,88 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         ((TextView) findViewById(R.id.text)).setText(txt);
     };
 
+    private ArrayMap<Integer, String> makeClassMap() {
+        ArrayMap<Integer, String> mCocoMap = new ArrayMap<>();
+            mCocoMap.put(1, "person");
+            mCocoMap.put(2, "bicycle");
+            mCocoMap.put(3, "car");
+            mCocoMap.put(4, "motorcycle");
+            mCocoMap.put(5, "airplane");
+            mCocoMap.put(6, "bus");
+            mCocoMap.put(7, "train");
+            mCocoMap.put(8, "truck");
+            mCocoMap.put(9, "boat");
+            mCocoMap.put(10, "traffic light");
+            mCocoMap.put(11, "fire hydrant");
+            mCocoMap.put(13, "stop sign");
+            mCocoMap.put(14, "parking meter");
+            mCocoMap.put(15, "bench");
+            mCocoMap.put(16, "bird");
+            mCocoMap.put(17, "cat");
+            mCocoMap.put(18, "dog");
+            mCocoMap.put(19, "horse");
+            mCocoMap.put(20, "sheep");
+            mCocoMap.put(21, "cow");
+            mCocoMap.put(22, "elephant");
+            mCocoMap.put(23, "bear");
+            mCocoMap.put(24, "zebra");
+            mCocoMap.put(25, "giraffe");
+            mCocoMap.put(27, "backpack");
+            mCocoMap.put(28, "umbrella");
+            mCocoMap.put(31, "handbag");
+            mCocoMap.put(32, "tie");
+            mCocoMap.put(33, "suitcase");
+            mCocoMap.put(34, "frisbee");
+            mCocoMap.put(35, "skis");
+            mCocoMap.put(36, "snowboard");
+            mCocoMap.put(37, "sports ball");
+            mCocoMap.put(38, "kite");
+            mCocoMap.put(39, "baseball bat");
+            mCocoMap.put(40, "baseball glove");
+            mCocoMap.put(41, "skateboard");
+            mCocoMap.put(42, "surfboard");
+            mCocoMap.put(43, "tennis racket");
+            mCocoMap.put(44, "bottle");
+            mCocoMap.put(46, "wine glass");
+            mCocoMap.put(47, "cup");
+            mCocoMap.put(48, "fork");
+            mCocoMap.put(49, "knife");
+            mCocoMap.put(50, "spoon");
+            mCocoMap.put(51, "bowl");
+            mCocoMap.put(52, "banana");
+            mCocoMap.put(53, "apple");
+            mCocoMap.put(54, "sandwich");
+            mCocoMap.put(55, "orange");
+            mCocoMap.put(56, "broccoli");
+            mCocoMap.put(57, "carrot");
+            mCocoMap.put(58, "hot dog");
+            mCocoMap.put(59, "pizza");
+            mCocoMap.put(60, "donut");
+            mCocoMap.put(61, "cake");
+            mCocoMap.put(62, "chair");
+            mCocoMap.put(63, "couch");
+            mCocoMap.put(64, "potted plant");
+            mCocoMap.put(65, "bed");
+            mCocoMap.put(67, "dining table");
+            mCocoMap.put(70, "toilet");
+            mCocoMap.put(72, "tv");
+            mCocoMap.put(73, "laptop");
+            mCocoMap.put(74, "mouse");
+            mCocoMap.put(75, "remote");
+            mCocoMap.put(76, "keyboard");
+            mCocoMap.put(77, "cell phone");
+            mCocoMap.put(78, "microwave");
+            mCocoMap.put(79, "oven");
+            mCocoMap.put(80, "toaster");
+            mCocoMap.put(81, "sink");
+            mCocoMap.put(82, "refrigerator");
+            mCocoMap.put(84, "book");
+            mCocoMap.put(85, "clock");
+            mCocoMap.put(86, "vase");
+            mCocoMap.put(87, "scissors");
+            mCocoMap.put(88, "teddy bear");
+            mCocoMap.put(89, "hair drier");
+            mCocoMap.put(90, "toothbrush");
+        return mCocoMap;
+    };
 }
