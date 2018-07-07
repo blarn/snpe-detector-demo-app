@@ -20,6 +20,7 @@ import com.qualcomm.qti.snpedetector.helpers.SNPEHelper;
 import com.qualcomm.qti.snpedetector.helpers.TimeStat;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 import io.fotoapparat.parameter.Resolution;
 import io.fotoapparat.preview.Frame;
@@ -63,6 +64,8 @@ public class MainActivity extends AppCompatActivity {
     private Paint mModelBitmapPaint;
     private final TimeStat mTimer = new TimeStat();
     private final TimeStat mTimer2 = new TimeStat();
+
+    private int ctr = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -191,6 +194,18 @@ public class MainActivity extends AppCompatActivity {
 
             // deep copy the results so we can draw the current set while guessing the next set
             mOverlayRenderer.setBoxesFromAnotherThread(boxes);
+
+            //INCREMENT OBJ COUNTERS
+
+            //IF TIMER AT t
+            //ObjCounter maxObj = Collections.max(list);
+            //mOverlayRenderer.accessibilityOutput("the object is "+maxObj.type_name);
+            //CLEAR DATA STRUCTURE
+
+            if(ctr % 60 == 0) {
+                mOverlayRenderer.accessibilityOutput("yay the audio is working");
+            }
+            ctr++;
 
             // done, schedule a UI update
             mTimer2.stopInterval("frame", 10, false);
