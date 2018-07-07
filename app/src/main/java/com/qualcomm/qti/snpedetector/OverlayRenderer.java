@@ -8,7 +8,8 @@ import android.support.annotation.Nullable;
 import android.util.ArrayMap;
 import android.util.AttributeSet;
 import android.view.View;
-
+import android.view.accessibility.AccessibilityManager;
+import android.view.accessibility.AccessibilityEvent;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
@@ -132,5 +133,18 @@ public class OverlayRenderer extends View {
             mColorIdxMap.put(index, Color.HSVToColor(hsv));
         }
         return mColorIdxMap.get(index);
+    }
+
+    public void accessibilityOutput(String output) {
+        AccessibilityManager manager = (AccessibilityManager) getContext()
+                .getSystemService(Context.ACCESSIBILITY_SERVICE);
+        if (manager.isEnabled()) {
+            AccessibilityEvent e = AccessibilityEvent.obtain();
+            e.setEventType(AccessibilityEvent.TYPE_ANNOUNCEMENT);
+            e.setClassName(getClass().getName());
+            e.setPackageName(getContext().getPackageName());
+            e.getText().add(output);
+            manager.sendAccessibilityEvent(e);
+        }
     }
 }
