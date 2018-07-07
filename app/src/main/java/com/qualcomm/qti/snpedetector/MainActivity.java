@@ -76,11 +76,12 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private final TimeStat mTimer2 = new TimeStat();
     private ArrayList<ObjCounter> counterList = ObjCounter.createCounters();
     private long prevTime;
-    private String speechInput;
     private ArrayMap<Integer, String> classificationMap;
 
     private double confLevel = 0.7;
     private int state = 0;
+
+    public ArrayList<Box> boxes;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -119,18 +120,22 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        speechInput = "";
         super.onActivityResult(requestCode, resultCode, data);
 
         switch (requestCode) {
             case 100: {
                 if (resultCode == RESULT_OK && null != data) {
-
                     ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-                    //txtSpeechInput.setText(result.get(0));
-                    //Toast.makeText(getApplicationContext(), result.get(0), Toast.LENGTH_SHORT).show();
-                    speechInput = result.get(0);
-                    modeB(speechInput);
+                    String speechInput = result.get(0);
+                    prevTime = System.currentTimeMillis();
+                    do {
+                        if(modeB(speechInput) != 0) {
+                            mOverlayRenderer.accessibilityOutput("found "+speechInput);
+                            return;
+                        }
+                    } while(System.currentTimeMillis() - prevTime < 20000);
+
+                    mOverlayRenderer.accessibilityOutput("could not find "+speechInput);
                 }
                 break;
             }
@@ -265,7 +270,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             // [2-45ms] give the bitmap to SNPE for inference
             mTimer.startInterval();
-            final ArrayList<Box> boxes = mSnpeHelper.mobileNetSSDInference(mModelInputBitmap);
+            boxes = mSnpeHelper.mobileNetSSDInference(mModelInputBitmap);
             mInferenceSkipped = boxes == null;
             mTimer.stopInterval("detect", 10, false);
 
@@ -357,9 +362,16 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     };
 
-    private void modeB(String a){
-        mOverlayRenderer.accessibilityOutput("Mode B started with " + a);
+    private int modeB(String input){
+        mOverlayRenderer.accessibilityOutput("Mode B started with " + input);
+        for (Box box : boxes) {
+            if (box.type_name.equals(input) && box.type_score > 0.6){
+                mOverlayRenderer.accessibilityOutput("found"+ input);
+                return 1;
+            }
 
+        }
+        return 0;
     }
 
     private SeekBar.OnSeekBarChangeListener mThresholdListener = new SeekBar.OnSeekBarChangeListener() {
