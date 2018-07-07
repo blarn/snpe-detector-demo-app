@@ -74,6 +74,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     private Paint mModelBitmapPaint;
     private final TimeStat mTimer = new TimeStat();
     private final TimeStat mTimer2 = new TimeStat();
+    private final TimeStat mTimer3 = new TimeStat();
     private ArrayList<ObjCounter> counterList = ObjCounter.createCounters();
     private long prevTime;
     private ArrayMap<Integer, String> classificationMap;
@@ -127,15 +128,38 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 if (resultCode == RESULT_OK && null != data) {
                     ArrayList<String> result = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
                     String speechInput = result.get(0);
-                    prevTime = System.currentTimeMillis();
-                    do {
-                        if(modeB(speechInput) != 0) {
-                            mOverlayRenderer.accessibilityOutput("found "+speechInput);
-                            return;
-                        }
-                    } while(System.currentTimeMillis() - prevTime < 20000);
 
-                    mOverlayRenderer.accessibilityOutput("could not find "+speechInput);
+                    if(!classificationMap.containsValue(speechInput)) {
+                        mOverlayRenderer.accessibilityOutput(speechInput+" is not a known category");
+                        //go back to mode A
+                        //buttonTest.setText("Switch to Finder");
+                        //buttonTest.setTag(1);
+                        return;
+                    }
+
+                    prevTime = System.currentTimeMillis();
+                    int val = 0;
+                    for(int i = 0; i<5; i++) {
+                        do {
+                            val = modeB(speechInput);
+                            if (val != 0) {
+                                //found
+                                mOverlayRenderer.accessibilityOutput(speechInput+" found!");
+                                break;
+                            }
+                        } while (System.currentTimeMillis() - prevTime < 2000);
+                        if(val != 0) break;
+                        mOverlayRenderer.accessibilityOutput("not finding " + speechInput + ", try moving camera");
+                    }
+
+                    if(val == 0) {
+                        //timed out
+                        mOverlayRenderer.accessibilityOutput(speechInput+" not found");
+                    }
+
+                    //go back to mode A
+                    //buttonTest.setText("Switch to Finder");
+                    //buttonTest.setTag(1);
                 }
                 break;
             }
@@ -279,82 +303,20 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
             if ((int) buttonTest.getTag() == 1) {
                 //mode A
-                //INCREMENT OBJ COUNTERS
                 for (Box box : boxes) {
                     if (box.type_id == 0 || box.type_score < confLevel) continue;
                     counterList.get(box.type_id).count++;
                 }
 
-                //IF TIMER AT t = 5 seconds
                 if (System.currentTimeMillis() - prevTime > 3000) {
-                    //print output
                     ObjCounter maxObj = Collections.max(counterList);
                     mOverlayRenderer.accessibilityOutput("there is a " + (String) (classificationMap.get((Integer) (maxObj.index)))+" in front of you");
 
-                    //clear list
                     counterList = ObjCounter.createCounters();
-
                     prevTime = System.currentTimeMillis();
                 }
             }
-            /*
-            else {
-                //mode B
 
-                if (state == 0) {
-                    //new query
-                    promptSpeechInput();
-                    //if (speechInput.equals("")) {
-                        //.accessibilityOutput("please repeat");
-                        promptSpeechInput();
-                        if (speechInput.equals("")) {
-                            mOverlayRenderer.accessibilityOutput("no input detected");
-                            //failed query, go to mode A
-                            state = 3;
-                        }
-                    }
-
-                    if (state != 3 && !classificationMap.containsValue(speechInput)) {
-                        mOverlayRenderer.accessibilityOutput("could not find " + speechInput);
-                        //failed query, go to mode A
-                        state = 3;
-                    } else if(state != 3 && classificationMap.containsValue(speechInput.toLowerCase().trim())){
-                        mOverlayRenderer.accessibilityOutput("looking for " + speechInput);
-                        state = 1; //start looking
-                        prevTime = System.currentTimeMillis();
-                    }
-                }
-
-                if (state != 3 && state == 1) { //?
-                    //look:
-                    for (Box box : boxes) {
-                        if (box.type_score > confLevel && box.type_name.equals(speechInput.toLowerCase().trim())) {
-                            //found
-                            mOverlayRenderer.accessibilityOutput("found " + speechInput);
-                            //go to mode A
-                            state = 3;
-                        }
-                    }
-
-                    //not found yet, keep trying until time runs out
-                    if ((state != 3) && (state == 1) && System.currentTimeMillis() - prevTime > 20000) {
-                        //time ran out
-                        mOverlayRenderer.accessibilityOutput("failed to find " + speechInput);
-                        //go to mode A
-                        prevTime = System.currentTimeMillis();
-                        state = 3;
-                    }
-                }
-
-                if (state == 3) {
-                    //go to mode A
-
-                    buttonTest.setText("Switch to Finder");
-                    buttonTest.setTag(1);
-                    state=0;
-                }
-            }
-    */
             // done, schedule a UI update
             mTimer2.stopInterval("frame", 10, false);
             mTimer2.tick("cam", 10);
@@ -362,17 +324,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         }
     };
 
-    private int modeB(String input){
-        mOverlayRenderer.accessibilityOutput("Mode B started with " + input);
-        for (Box box : boxes) {
-            if (box.type_name.equals(input) && box.type_score > 0.6){
-                mOverlayRenderer.accessibilityOutput("found"+ input);
-                return 1;
-            }
 
-        }
-        return 0;
-    }
 
     private SeekBar.OnSeekBarChangeListener mThresholdListener = new SeekBar.OnSeekBarChangeListener() {
         @Override
@@ -433,8 +385,17 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 ", scale: " + mTimer.getAverageInterval("scalerot") +
                 ", detect: " + mTimer.getAverageInterval("detect") + ")\n";
         //txt += "Thresh: " + mOverlayRenderer.getBoxScoreThreshold();
-        ((TextView) findViewById(R.id.text)).setText(txt);
+        ((TextView) findViewById(R.id.text)).setText(" ");
     };
+
+    public int modeB(String input){
+        for(Box box : boxes){
+            if(box.type_name.equals(input) && box.type_score>0.6){
+                return 1;
+            }
+        }
+        return 0;
+    }
 
     private ArrayMap<Integer, String> makeClassMap() {
         ArrayMap<Integer, String> mCocoMap = new ArrayMap<>();
